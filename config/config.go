@@ -6,8 +6,9 @@ package config
 import "time"
 
 type Config struct {
-	Period  time.Duration `config:"period"`
-	Classes []ClassConfig
+	Period    time.Duration `config:"period"`
+	Namespace string        `config:"namespace"`
+	Classes   []ClassConfig
 }
 
 type ClassConfig struct {

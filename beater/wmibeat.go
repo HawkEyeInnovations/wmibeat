@@ -106,7 +106,7 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 	}
 	defer wmiqi.Release()
 
-	serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer")
+	serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer", ".", bt.config.Namespace)
 	if err != nil {
 		logp.Err("Unable to connect to server: %v", err)
 		return err
