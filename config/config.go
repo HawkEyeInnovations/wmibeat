@@ -6,17 +6,17 @@ package config
 import "time"
 
 type Config struct {
-	Period    time.Duration `config:"period"`
-	Namespace string        `config:"namespace"`
-	Classes   []ClassConfig
+	Queries []QueryConfig
 }
 
-type ClassConfig struct {
-	Class       string   `config:"class"`
-	Fields      []string `config:"fields"`
-	WhereClause string   `config:"whereclause"`
+type QueryConfig struct {
+	Period      time.Duration `config:"period"`
+	Class       string        `config:"class"`
+	Fields      []string      `config:"fields"`
+	WhereClause string        `config:"whereclause"`
+	Namespace   string        `config:"namespace"`
 }
 
-var DefaultConfig = Config{
+var DefaultConfig = QueryConfig{
 	Period: 1 * time.Second,
 }

@@ -4,81 +4,114 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
 	"github.com/elastic/beats/libbeat/common"
 	"github.com/elastic/beats/libbeat/logp"
-
 	"github.com/eskibars/wmibeat/config"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 )
 
 type Wmibeat struct {
-	config             config.Config
-	client             beat.Client
-	compiledWmiQueries map[string]string
-	done               chan struct{}
+	queries []*Query
+	done    chan struct{}
+}
+
+type Query struct {
+	query  string
+	config config.QueryConfig
 }
 
 // Creates beater
 func New(b *beat.Beat, cfg *common.Config) (beat.Beater, error) {
-	c := config.DefaultConfig
-	if err := cfg.Unpack(&c); err != nil {
+	config := config.Config{}
+	if err := cfg.Unpack(&config); err != nil {
 		return nil, fmt.Errorf("Error reading config file: %v", err)
 	}
 	bt := &Wmibeat{
-		done:   make(chan struct{}),
-		config: c,
+		done: make(chan struct{}),
+	}
+
+	for _, queryConfig := range config.Queries {
+		query, err := NewQuery(queryConfig)
+		if err == nil {
+			bt.queries = append(bt.queries, query)
+		} else {
+			logp.Warn(err.Error())
+		}
 	}
 
 	return bt, nil
 }
 
-// Run starts wmibeat.
-func (bt *Wmibeat) Run(b *beat.Beat) error {
-	var err error
-	bt.client, err = b.Publisher.Connect()
-	if err != nil {
-		return err
+func NewQuery(config config.QueryConfig) (*Query, error) {
+	if len(config.Fields) == 0 {
+		return nil, fmt.Errorf("No fields defined for class %v. Skipping", config.Class)
 	}
 
-	bt.compiledWmiQueries = map[string]string{}
-	for _, class := range bt.config.Classes {
-		if len(class.Fields) == 0 {
-			var errorString bytes.Buffer
-			errorString.WriteString("No fields defined for class ")
-			errorString.WriteString(class.Class)
-			errorString.WriteString(".  Skipping")
-			logp.Warn(errorString.String())
-			continue
+	var query bytes.Buffer
+	query.WriteString("SELECT ")
+	query.WriteString(strings.Join(config.Fields, ","))
+	query.WriteString(" FROM ")
+	query.WriteString(config.Class)
+	if config.WhereClause != "" {
+		query.WriteString(" WHERE ")
+		query.WriteString(config.WhereClause)
+	}
+
+	q := &Query{
+		query:  query.String(),
+		config: config,
+	}
+
+	logp.Info("Created query %v", q.query)
+
+	return q, nil
+}
+
+// Run starts wmibeat.
+func (bt *Wmibeat) Run(b *beat.Beat) error {
+	var wg sync.WaitGroup
+	ole.CoInitializeEx(0, 0)
+	defer ole.CoUninitialize()
+
+	for _, q := range bt.queries {
+		client, err := b.Publisher.Connect()
+		if err != nil {
+			return err
 		}
-		var query bytes.Buffer
-		query.WriteString("SELECT ")
-		query.WriteString(strings.Join(class.Fields, ","))
-		query.WriteString(" FROM ")
-		query.WriteString(class.Class)
-		if class.WhereClause != "" {
-			query.WriteString(" WHERE ")
-			query.WriteString(class.WhereClause)
-		}
-		bt.compiledWmiQueries[class.Class] = query.String()
+
+		wg.Add(1)
+		go func(query *Query) {
+			defer wg.Done()
+			query.Run(bt.done, client)
+		}(q)
 	}
 
 	logp.Info("wmibeat is running! Hit CTRL-C to stop it.")
 
-	ticker := time.NewTicker(bt.config.Period)
+	wg.Wait()
+	return nil
+}
+
+func (query *Query) Run(done <-chan struct{}, client beat.Client) error {
+	var err error
+
+	ticker := time.NewTicker(query.config.Period)
 	defer ticker.Stop()
 
 	for {
 		select {
-		case <-bt.done:
+		case <-done:
 			return nil
 		case <-ticker.C:
 		}
 
-		err := bt.RunOnce(b)
+		err := query.RunOnce(client)
 		if err != nil {
 			logp.Err("Unable to run WMI queries: %v", err)
 			break
@@ -88,9 +121,8 @@ func (bt *Wmibeat) Run(b *beat.Beat) error {
 	return err
 }
 
-func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
-	ole.CoInitializeEx(0, 0)
-	defer ole.CoUninitialize()
+func (query *Query) RunOnce(client beat.Client) error {
+	events := []common.MapStr{}
 
 	wmiscriptObj, err := oleutil.CreateObject("WbemScripting.SWbemLocator")
 	if err != nil {
@@ -106,7 +138,7 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 	}
 	defer wmiqi.Release()
 
-	serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer", ".", bt.config.Namespace)
+	serviceObj, err := oleutil.CallMethod(wmiqi, "ConnectServer", ".", query.config.Namespace)
 	if err != nil {
 		logp.Err("Unable to connect to server: %v", err)
 		return err
@@ -115,62 +147,53 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 
 	service := serviceObj.ToIDispatch()
 
-	events := []common.MapStr{}
+	logp.Info("Query: " + query.query)
 
-	for _, class := range bt.config.Classes {
-		query, exists := bt.compiledWmiQueries[class.Class]
-		if !exists {
-			continue
-		}
+	resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.query, "WQL")
+	if err != nil {
+		logp.Err("Unable to execute query: %v", err)
+		return err
+	}
+	defer resultObj.Clear()
 
-		logp.Info("Query: " + query)
+	result := resultObj.ToIDispatch()
+	countObj, err := oleutil.GetProperty(result, "Count")
+	if err != nil {
+		logp.Err("Unable to get result count: %v", err)
+		return err
+	}
+	defer countObj.Clear()
 
-		resultObj, err := oleutil.CallMethod(service, "ExecQuery", query, "WQL")
+	count := int(countObj.Val)
+
+	for i := 0; i < count; i++ {
+		rowObj, err := oleutil.CallMethod(result, "ItemIndex", i)
 		if err != nil {
-			logp.Err("Unable to execute query: %v", err)
+			logp.Err("Unable to get result item by index: %v", err)
 			return err
 		}
-		defer resultObj.Clear()
+		defer rowObj.Clear()
 
-		result := resultObj.ToIDispatch()
-		countObj, err := oleutil.GetProperty(result, "Count")
-		if err != nil {
-			logp.Err("Unable to get result count: %v", err)
-			return err
+		row := rowObj.ToIDispatch()
+
+		event := common.MapStr{
+			"class": query.config.Class,
+			"type":  "wmibeat",
 		}
-		defer countObj.Clear()
 
-		count := int(countObj.Val)
-
-		for i := 0; i < count; i++ {
-			rowObj, err := oleutil.CallMethod(result, "ItemIndex", i)
+		for _, fieldName := range query.config.Fields {
+			wmiObj, err := oleutil.GetProperty(row, fieldName)
 			if err != nil {
-				logp.Err("Unable to get result item by index: %v", err)
+				logp.Err("Unable to get propery by name: %v", err)
 				return err
 			}
-			defer rowObj.Clear()
+			defer wmiObj.Clear()
 
-			row := rowObj.ToIDispatch()
-
-			event := common.MapStr{
-				"class": class.Class,
-				"type":  "wmibeat",
-			}
-
-			for _, fieldName := range class.Fields {
-				wmiObj, err := oleutil.GetProperty(row, fieldName)
-				if err != nil {
-					logp.Err("Unable to get propery by name: %v", err)
-					return err
-				}
-				defer wmiObj.Clear()
-
-				var objValue = wmiObj.Value()
-				event[fieldName] = objValue
-			}
-
-			events = append(events, event)
+			var objValue = wmiObj.Value()
+			event[fieldName] = objValue
 		}
+
+		events = append(events, event)
 	}
 
 	for _, wmievent := range events {
@@ -180,18 +203,13 @@ func (bt *Wmibeat) RunOnce(b *beat.Beat) error {
 				Fields:    wmievent,
 			}
 
-			bt.client.Publish(event)
+			client.Publish(event)
 		}
 	}
 
 	return err
 }
 
-func (bt *Wmibeat) Cleanup(b *beat.Beat) error {
-	return nil
-}
-
 func (bt *Wmibeat) Stop() {
 	close(bt.done)
-	bt.client.Close()
 }
