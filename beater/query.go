@@ -47,8 +47,6 @@ func NewQuery(config config.QueryConfig) (*Query, error) {
 
 // Run loop for the query
 func (query *Query) Run(done <-chan struct{}, client beat.Client) error {
-	var err error
-
 	ticker := time.NewTicker(query.config.Period)
 	defer ticker.Stop()
 
@@ -59,14 +57,10 @@ func (query *Query) Run(done <-chan struct{}, client beat.Client) error {
 		case <-ticker.C:
 		}
 
-		err := query.RunQuery(client)
-		if err != nil {
-			logp.Err("Unable to run WMI queries: %v", err)
-			break
+		if err := query.RunQuery(client); err != nil {
+			logp.Err("Unable to run WMI query: %v", err)
 		}
 	}
-
-	return err
 }
 
 // RunQuery runs one instance of the query
