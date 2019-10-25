@@ -3,17 +3,20 @@
 
 package config
 
+import "time"
+
 type Config struct {
-	Wmibeat WmibeatConfig
+	Queries []QueryConfig
 }
 
-type WmibeatConfig struct {
-	Period   string `yaml:"period"`
-	Classes  []ClassConfig
+type QueryConfig struct {
+	Period      time.Duration `config:"period"`
+	Class       string        `config:"class"`
+	Fields      []string      `config:"fields"`
+	WhereClause string        `config:"whereclause"`
+	Namespace   string        `config:"namespace"`
 }
 
-type ClassConfig struct {
-	Class       string    `config:"class"`
-	Fields      []string  `config:"fields"`
-	WhereClause string    `config:"whereclause"`
+var DefaultConfig = QueryConfig{
+	Period: 1 * time.Second,
 }
