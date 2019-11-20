@@ -124,7 +124,7 @@ func (query *Query) RunQuery(client beat.Client) error {
 		for _, fieldName := range query.config.Fields {
 			wmiObj, err := oleutil.GetProperty(row, fieldName)
 			if err != nil {
-				logp.Err("Unable to get property %v: %v", fieldName, err)
+				logp.Warn("Unable to get property %v: %v", fieldName, err)
 				continue
 			}
 			defer wmiObj.Clear()
