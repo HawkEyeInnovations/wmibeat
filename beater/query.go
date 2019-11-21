@@ -3,7 +3,6 @@ package beater
 import (
 	"bytes"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
@@ -26,9 +25,7 @@ func NewQuery(config config.QueryConfig) (*Query, error) {
 	}
 
 	var query bytes.Buffer
-	query.WriteString("SELECT ")
-	query.WriteString(strings.Join(config.Fields, ","))
-	query.WriteString(" FROM ")
+	query.WriteString("SELECT * FROM ")
 	query.WriteString(config.Class)
 	if config.WhereClause != "" {
 		query.WriteString(" WHERE ")
@@ -127,8 +124,8 @@ func (query *Query) RunQuery(client beat.Client) error {
 		for _, fieldName := range query.config.Fields {
 			wmiObj, err := oleutil.GetProperty(row, fieldName)
 			if err != nil {
-				logp.Err("Unable to get propery by name: %v", err)
-				return err
+				logp.Warn("Unable to get property %v: %v", fieldName, err)
+				continue
 			}
 			defer wmiObj.Clear()
 
