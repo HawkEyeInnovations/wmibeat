@@ -3,16 +3,23 @@
 
 package config
 
-import "time"
+import (
+	"time"
+)
 
 type Config struct {
 	Queries []QueryConfig
 }
 
+type Field struct {
+	Name  string `config:"name"`
+	IsInt bool   `config:"int"`
+}
+
 type QueryConfig struct {
 	Period      time.Duration `config:"period"`
 	Class       string        `config:"class"`
-	Fields      []string      `config:"fields"`
+	Fields      []Field       `config:"fields"`
 	WhereClause string        `config:"whereclause"`
 	Namespace   string        `config:"namespace"`
 }

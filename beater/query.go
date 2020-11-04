@@ -3,6 +3,7 @@ package beater
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
@@ -121,7 +122,8 @@ func (query *Query) RunQuery(client beat.Client) error {
 			"type":  "wmibeat",
 		}
 
-		for _, fieldName := range query.config.Fields {
+		for _, field := range query.config.Fields {
+			fieldName := field.Name
 			wmiObj, err := oleutil.GetProperty(row, fieldName)
 			if err != nil {
 				logp.Warn("Unable to get property %v: %v", fieldName, err)
@@ -129,8 +131,16 @@ func (query *Query) RunQuery(client beat.Client) error {
 			}
 			defer wmiObj.Clear()
 
-			var objValue = wmiObj.Value()
-			event[fieldName] = objValue
+			if field.IsInt {
+				i, err := strconv.Atoi(wmiObj.ToString())
+				if err != nil {
+					logp.Err("Failed to convert %v to int: %v", wmiObj.Value(), err)
+					continue
+				}
+				event[fieldName] = i
+			} else {
+				event[fieldName] = wmiObj.Value()
+			}
 		}
 
 		events = append(events, event)
