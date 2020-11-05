@@ -4,7 +4,10 @@
 package config
 
 import (
+	"strconv"
 	"time"
+
+	"github.com/go-ole/go-ole"
 )
 
 type Config struct {
@@ -26,4 +29,12 @@ type QueryConfig struct {
 
 var DefaultConfig = QueryConfig{
 	Period: 1 * time.Second,
+}
+
+func (f *Field) Convert(v *ole.VARIANT) (interface{}, error) {
+	if f.IsInt {
+		return strconv.Atoi(v.ToString())
+	}
+
+	return v.Value(), nil
 }

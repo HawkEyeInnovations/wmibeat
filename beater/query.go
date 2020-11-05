@@ -3,7 +3,6 @@ package beater
 import (
 	"bytes"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/elastic/beats/libbeat/beat"
@@ -131,16 +130,14 @@ func (query *Query) RunQuery(client beat.Client) error {
 			}
 			defer wmiObj.Clear()
 
-			if field.IsInt {
-				i, err := strconv.Atoi(wmiObj.ToString())
-				if err != nil {
-					logp.Err("Failed to convert %v to int: %v", wmiObj.Value(), err)
-					continue
-				}
-				event[fieldName] = i
-			} else {
-				event[fieldName] = wmiObj.Value()
+			value, err := field.Convert(wmiObj)
+
+			if err != nil {
+				logp.Warn("Unable to convert property %v: %v", fieldName, err)
+				continue
 			}
+
+			event[fieldName] = value
 		}
 
 		events = append(events, event)
