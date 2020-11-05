@@ -37,7 +37,7 @@ func NewQuery(config config.QueryConfig) (*Query, error) {
 		config: config,
 	}
 
-	logp.Info("Created query %v", q.query)
+	logp.Info("Created query %s", q.query)
 
 	return q, nil
 }
@@ -87,7 +87,7 @@ func (query *Query) RunQuery(client beat.Client) error {
 
 	service := serviceObj.ToIDispatch()
 
-	logp.Info("Query: " + query.query)
+	logp.Info("Query: %s", query.query)
 
 	resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.query, "WQL")
 	if err != nil {
