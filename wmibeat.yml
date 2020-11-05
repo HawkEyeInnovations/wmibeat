@@ -3,36 +3,45 @@
 ############################# wmibeat ######################################
 
 wmibeat:
-  # Defines how often an event is sent to the output
-  period: 30s
-  
-  classes:
+  queries:
     - class: Win32_OperatingSystem
+      period: 1m
       fields:
-      - FreePhysicalMemory
-      - FreeSpaceInPagingFiles
-      - FreeVirtualMemory
-      - NumberOfProcesses
-      - NumberOfUsers
+      - name: FreePhysicalMemory
+      - name: FreeSpaceInPagingFiles
+      - name: FreeVirtualMemory
+      - name: NumberOfProcesses
+      - name: NumberOfUsers
     - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
+      period: 10s
       fields:
-      - Name
-      - FreeMegabytes
-      - PercentFreeSpace
-      - CurrentDiskQueueLength
-      - DiskReadsPerSec
-      - DiskWritesPerSec
-      - DiskBytesPerSec
-      - PercentDiskReadTime
-      - PercentDiskWriteTime
-      - PercentDiskTime
+      - name: Name
+      - name: FreeMegabytes
+      - name: PercentFreeSpace
+      - name: CurrentDiskQueueLength
+      - name: DiskReadsPerSec
+      - name: DiskWritesPerSec
+      - name: DiskBytesPerSec
+      - name: PercentDiskReadTime
+      - name: PercentDiskWriteTime
+      - name: PercentDiskTime
       whereclause: Name != "_Total"
-      objecttitlecolumn: Name
     - class: Win32_PerfFormattedData_PerfOS_Memory
+      namespace: root/CIMV2
+      period: 10s
       fields:
-      - CommittedBytes
-      - AvailableBytes
-      - PercentCommittedBytesInUse
+      - name: CommittedBytes
+      - name: AvailableBytes
+      - name: PercentCommittedBytesInUse
+    - class: Win32_PerfFormattedData_Counters_ProcessorInformation
+      period: 10s
+      fields:
+        - name: Name
+        - name: PercentProcessorTime
+          int: true
+        - name: PercentProcessorUtility
+          int: true
+      whereclause: Name Like "%,_Total"
 
 ###############################################################################
 ############################# Libbeat Config ##################################
@@ -45,12 +54,12 @@ wmibeat:
 output:
 
   ### Elasticsearch as output
-  elasticsearch:
+  #elasticsearch:
     # Array of hosts to connect to.
     # Scheme and port can be left out and will be set to the default (http and 9200)
     # In case you specify and additional path, the scheme is required: http://localhost:9200/path
     # IPv6 addresses should always be defined as: https://[2001:db8::1]:9200
-    hosts: ["localhost:9200"]
+    #hosts: ["localhost:9200"]
 
     # Optional protocol and basic auth credentials.
     #protocol: "https"
@@ -206,7 +215,7 @@ output:
 
 
   ### Console output
-  # console:
+  console:
     # Pretty print json event
     #pretty: false
 
