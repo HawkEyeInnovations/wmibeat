@@ -7,3 +7,5 @@ import:
   - libbeat/cfgfile
   - libbeat/common
   - libbeat/logp
+- package: github.com/elastic/go-ucfg
+  version: v0.8.3

@@ -3,11 +3,9 @@
 ############################# wmibeat ######################################
 
 wmibeat:
-  # Defines how often an event is sent to the output
-  period: 30s
-  
-  classes:
+  queries:
     - class: Win32_OperatingSystem
+      period: 1m
       fields:
       - FreePhysicalMemory
       - FreeSpaceInPagingFiles
@@ -15,6 +13,7 @@ wmibeat:
       - NumberOfProcesses
       - NumberOfUsers
     - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
+      period: 10s
       fields:
       - Name
       - FreeMegabytes
@@ -27,12 +26,22 @@ wmibeat:
       - PercentDiskWriteTime
       - PercentDiskTime
       whereclause: Name != "_Total"
-      objecttitlecolumn: Name
     - class: Win32_PerfFormattedData_PerfOS_Memory
+      namespace: root/CIMV2
+      period: 10s
       fields:
       - CommittedBytes
       - AvailableBytes
       - PercentCommittedBytesInUse
+    - class: Win32_PerfFormattedData_Counters_ProcessorInformation
+      period: 10s
+      fields:
+        - Name
+        - name: PercentProcessorTime
+          int: true
+        - name: PercentProcessorUtility
+          int: true
+      whereclause: Name Like "%,_Total"
 
 ###############################################################################
 ############################# Libbeat Config ##################################
@@ -45,12 +54,12 @@ wmibeat:
 output:
 
   ### Elasticsearch as output
-  elasticsearch:
+  #elasticsearch:
     # Array of hosts to connect to.
     # Scheme and port can be left out and will be set to the default (http and 9200)
     # In case you specify and additional path, the scheme is required: http://localhost:9200/path
     # IPv6 addresses should always be defined as: https://[2001:db8::1]:9200
-    hosts: ["localhost:9200"]
+    #hosts: ["localhost:9200"]
 
     # Optional protocol and basic auth credentials.
     #protocol: "https"
@@ -206,7 +215,7 @@ output:
 
 
   ### Console output
-  # console:
+  console:
     # Pretty print json event
     #pretty: false
 

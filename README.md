@@ -13,8 +13,9 @@ If you don't want to build your own, hop over to the "releases" page to download
 ### Configuring
 To configure the WMI queries to run, you need to change wmibeat.yml.  Working from the default example:
 
-    classes:
+    queries:
     - class: Win32_OperatingSystem
+      period: 1m
       fields:
       - FreePhysicalMemory
       - FreeSpaceInPagingFiles
@@ -22,6 +23,7 @@ To configure the WMI queries to run, you need to change wmibeat.yml.  Working fr
       - NumberOfProcesses
       - NumberOfUsers
     - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
+      period: 10s
       fields:
       - Name
       - FreeMegabytes
@@ -34,15 +36,26 @@ To configure the WMI queries to run, you need to change wmibeat.yml.  Working fr
       - PercentDiskWriteTime
       - PercentDiskTime
       whereclause: Name != "_Total"
-	  objecttitlecolumn: Name
     - class: Win32_PerfFormattedData_PerfOS_Memory
+      namespace: root/CIMV2
+      period: 10s
       fields:
       - CommittedBytes
       - AvailableBytes
       - PercentCommittedBytesInUse
+    - class: Win32_PerfFormattedData_Counters_ProcessorInformation
+      period: 10s
+      fields:
+        - Name
+        - name: PercentProcessorTime
+          int: true
+        - name: PercentProcessorUtility
+          int: true
+      whereclause: Name Like "%,_Total"
 
-We can configure a set of classes, a set of fields per class, and a whereclause.  If there are multiple results, for any WMI class,
-WMIbeat will add the results as arrays.  If you need some help with what classes/fields, you can try [WMI Explorer](https://wmie.codeplex.com/).
+For each class we can define: the wmi namespace, the polling period, the fields and the whereclause. Fields can either be a string, or an object with a `name` and `int` boolean argumentc which if set to true will convert the string value returned from WMI to an integer value. This is useful for `Win32_PerfFormattedData_Counters_ProcessorInformation` where `PercentProcessorTime` and `PercentProcessorUtility` are returned as strings from WMI but are actually numerical values.
+
+If there are multiple results, for any WMI class, WMIbeat will add the results as arrays.  If you need some help with what classes/fields, you can try [WMI Explorer](https://wmie.codeplex.com/).
 Note that many of the more interesting classes are "Perf" classes, which has a special checkbox to see in that tool.
 	  
 ### Run

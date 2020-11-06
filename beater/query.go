@@ -37,7 +37,7 @@ func NewQuery(config config.QueryConfig) (*Query, error) {
 		config: config,
 	}
 
-	logp.Info("Created query %v", q.query)
+	logp.Info("Created query %s", q.query)
 
 	return q, nil
 }
@@ -87,7 +87,7 @@ func (query *Query) RunQuery(client beat.Client) error {
 
 	service := serviceObj.ToIDispatch()
 
-	logp.Info("Query: " + query.query)
+	logp.Info("Query: %s", query.query)
 
 	resultObj, err := oleutil.CallMethod(service, "ExecQuery", query.query, "WQL")
 	if err != nil {
@@ -121,7 +121,8 @@ func (query *Query) RunQuery(client beat.Client) error {
 			"type":  "wmibeat",
 		}
 
-		for _, fieldName := range query.config.Fields {
+		for _, field := range query.config.Fields {
+			fieldName := field.Name
 			wmiObj, err := oleutil.GetProperty(row, fieldName)
 			if err != nil {
 				logp.Warn("Unable to get property %v: %v", fieldName, err)
@@ -129,8 +130,14 @@ func (query *Query) RunQuery(client beat.Client) error {
 			}
 			defer wmiObj.Clear()
 
-			var objValue = wmiObj.Value()
-			event[fieldName] = objValue
+			value, err := field.Convert(wmiObj)
+
+			if err != nil {
+				logp.Warn("Unable to convert property %v: %v", fieldName, err)
+				continue
+			}
+
+			event[fieldName] = value
 		}
 
 		events = append(events, event)
