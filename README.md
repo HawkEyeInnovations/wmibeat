@@ -17,43 +17,43 @@ To configure the WMI queries to run, you need to change wmibeat.yml.  Working fr
     - class: Win32_OperatingSystem
       period: 1m
       fields:
-      - name: FreePhysicalMemory
-      - name: FreeSpaceInPagingFiles
-      - name: FreeVirtualMemory
-      - name: NumberOfProcesses
-      - name: NumberOfUsers
+      - FreePhysicalMemory
+      - FreeSpaceInPagingFiles
+      - FreeVirtualMemory
+      - NumberOfProcesses
+      - NumberOfUsers
     - class: Win32_PerfFormattedData_PerfDisk_LogicalDisk
       period: 10s
       fields:
-      - name: Name
-      - name: FreeMegabytes
-      - name: PercentFreeSpace
-      - name: CurrentDiskQueueLength
-      - name: DiskReadsPerSec
-      - name: DiskWritesPerSec
-      - name: DiskBytesPerSec
-      - name: PercentDiskReadTime
-      - name: PercentDiskWriteTime
-      - name: PercentDiskTime
+      - Name
+      - FreeMegabytes
+      - PercentFreeSpace
+      - CurrentDiskQueueLength
+      - DiskReadsPerSec
+      - DiskWritesPerSec
+      - DiskBytesPerSec
+      - PercentDiskReadTime
+      - PercentDiskWriteTime
+      - PercentDiskTime
       whereclause: Name != "_Total"
     - class: Win32_PerfFormattedData_PerfOS_Memory
       namespace: root/CIMV2
       period: 10s
       fields:
-      - name: CommittedBytes
-      - name: AvailableBytes
-      - name: PercentCommittedBytesInUse
+      - CommittedBytes
+      - AvailableBytes
+      - PercentCommittedBytesInUse
     - class: Win32_PerfFormattedData_Counters_ProcessorInformation
       period: 10s
       fields:
-        - name: Name
+        - Name
         - name: PercentProcessorTime
           int: true
         - name: PercentProcessorUtility
           int: true
       whereclause: Name Like "%,_Total"
 
-For each class we can define: the wmi namespace, the polling period, the fields and the whereclause. Fields can have the optional boolean argument of `int` which if set to true will convert the string value returned from WMI to an integer value. This is useful for `Win32_PerfFormattedData_Counters_ProcessorInformation` where `PercentProcessorTime` and `PercentProcessorUtility` are returned as strings from WMI but are actually numerical values.
+For each class we can define: the wmi namespace, the polling period, the fields and the whereclause. Fields can either be a string, or an object with a `name` and `int` boolean argumentc which if set to true will convert the string value returned from WMI to an integer value. This is useful for `Win32_PerfFormattedData_Counters_ProcessorInformation` where `PercentProcessorTime` and `PercentProcessorUtility` are returned as strings from WMI but are actually numerical values.
 
 If there are multiple results, for any WMI class, WMIbeat will add the results as arrays.  If you need some help with what classes/fields, you can try [WMI Explorer](https://wmie.codeplex.com/).
 Note that many of the more interesting classes are "Perf" classes, which has a special checkbox to see in that tool.
